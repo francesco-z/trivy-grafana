@@ -1,0 +1,23 @@
+apiVersion: fleet.cattle.io/v1alpha1
+kind: GitRepo
+metadata:
+  annotations:
+    field.cattle.io/description: Prometheus + Grafana for trivy-operator metrics
+  name: kube-prometheus-stack
+  namespace: fleet-local
+spec:
+  branch: main
+  clientSecretName: <fleet-git-auth-secret>
+  correctDrift: {}
+  # one bundle per fleet.yaml: rancher-cluster/chart (Helm) and rancher-cluster/manifests (route, egress)
+  paths:
+    - kube-prometheus-stack/rancher-cluster
+  pollingInterval: 1m0s
+  repo: ssh://git@git.example.org/observability.git
+  targets:
+    - clusterSelector:
+        matchExpressions:
+          - key: provider.cattle.io
+            operator: NotIn
+            values:
+              - harvester

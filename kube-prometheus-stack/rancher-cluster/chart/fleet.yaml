@@ -1,0 +1,136 @@
+defaultNamespace: monitoring
+helm:
+  releaseName: kube-prometheus-stack
+  repo: https://prometheus-community.github.io/helm-charts
+  chart: kube-prometheus-stack
+  version: 92.14.1
+  # inline, not valuesFiles: a values.yaml next to fleet.yaml could be picked up as a raw manifest
+  values:
+    # kube-prometheus-stack trimmed to Prometheus + Grafana: only trivy-operator metrics are scraped
+    crds:
+      enabled: true
+
+    defaultRules:
+      create: false
+
+    alertmanager:
+      enabled: false
+
+    kubeStateMetrics:
+      enabled: false
+    nodeExporter:
+      enabled: false
+    kubeApiServer:
+      enabled: false
+    kubelet:
+      enabled: false
+    kubeControllerManager:
+      enabled: false
+    coreDns:
+      enabled: false
+    kubeDns:
+      enabled: false
+    kubeEtcd:
+      enabled: false
+    kubeScheduler:
+      enabled: false
+    kubeProxy:
+      enabled: false
+
+    prometheusOperator:
+      # certgen job image lives on registry.k8s.io, which is not mirrored
+      admissionWebhooks:
+        enabled: false
+      tls:
+        enabled: false
+
+    prometheus:
+      prometheusSpec:
+        retention: 15d
+        # mounted at /etc/prometheus/secrets/<name>/, created out of git (see README)
+        secrets:
+          - trivy-metrics-cluster-a
+          - trivy-metrics-cluster-b
+          - trivy-metrics-cluster-c
+        additionalScrapeConfigs:
+          - job_name: trivy-operator
+            scrape_interval: 60s
+            static_configs:
+              - targets:
+                  - trivy-operator.trivy-system.svc:80
+                labels:
+                  cluster: rancher
+          # downstream clusters: kube-apiserver service proxy, no exposure of trivy-operator needed
+          - job_name: trivy-operator-cluster-a
+            scrape_interval: 60s
+            scheme: https
+            metrics_path: /api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics
+            authorization:
+              credentials_file: /etc/prometheus/secrets/trivy-metrics-cluster-a/token
+            tls_config:
+              ca_file: /etc/prometheus/secrets/trivy-metrics-cluster-a/ca.crt
+            static_configs:
+              - targets:
+                  - cluster-a-cluster-api.example.org:6443
+                labels:
+                  cluster: cluster-a
+          - job_name: trivy-operator-cluster-b
+            scrape_interval: 60s
+            scheme: https
+            metrics_path: /api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics
+            authorization:
+              credentials_file: /etc/prometheus/secrets/trivy-metrics-cluster-b/token
+            tls_config:
+              ca_file: /etc/prometheus/secrets/trivy-metrics-cluster-b/ca.crt
+            static_configs:
+              - targets:
+                  - cluster-b-cluster-api.example.org:6443
+                labels:
+                  cluster: cluster-b
+          - job_name: trivy-operator-cluster-c
+            scrape_interval: 60s
+            scheme: https
+            metrics_path: /api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics
+            authorization:
+              credentials_file: /etc/prometheus/secrets/trivy-metrics-cluster-c/token
+            tls_config:
+              ca_file: /etc/prometheus/secrets/trivy-metrics-cluster-c/ca.crt
+            static_configs:
+              - targets:
+                  - cluster-c-cluster-api.example.org:6443
+                labels:
+                  cluster: cluster-c
+
+    grafana:
+      enabled: true
+      # credentials from the out-of-chart secret grafana-admin
+      admin:
+        existingSecret: grafana-admin
+        userKey: admin-user
+        passwordKey: admin-password
+      # k8s dashboards are useless without the disabled exporters
+      defaultDashboardsEnabled: false
+      persistence:
+        enabled: false
+      grafana.ini:
+        server:
+          root_url: https://grafana.example.org
+      dashboardProviders:
+        dashboardproviders.yaml:
+          apiVersion: 1
+          providers:
+            - name: trivy
+              orgId: 1
+              folder: Trivy
+              type: file
+              disableDeletion: true
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/trivy
+      dashboards:
+        trivy:
+          trivy-operator:
+            # https://grafana.com/grafana/dashboards/17813-trivy-operator-dashboard/
+            gnetId: 17813
+            revision: 2
+            datasource: Prometheus
