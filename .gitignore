@@ -29,5 +29,7 @@ go.work.sum
 # site values (hostnames, IPs, repo URL), see values-site.example.yaml
 values-site.yaml
 
-# helm dependency build output (Chart.lock is committed)
+# helm dependency build output; Chart.lock stays out of git: with it Fleet runs a
+# lock-based build that never fetches the repo index ("no cached repository for helm-manager-...")
 chart/charts/
+chart/Chart.lock

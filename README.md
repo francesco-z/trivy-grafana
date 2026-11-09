@@ -77,7 +77,7 @@ yq -y --arg repo "$(yq -r '.fleetGitRepo.repo' values-site.yaml)" --arg auth "$(
 
 Change values in git or in `values-site.yaml` (then re-create the ConfigMap), not in the Rancher console. The release name `kube-prometheus-stack` keeps the resource names of the former plain kube-prometheus-stack install.
 
-Upgrade kube-prometheus-stack: bump `dependencies[0].version` in `chart/Chart.yaml`, run `helm dependency update chart`, commit `Chart.lock`, check the upstream upgrade notes (CRDs).
+Upgrade kube-prometheus-stack: bump `dependencies[0].version` in `chart/Chart.yaml`, run `helm dependency update chart`, check the upstream upgrade notes (CRDs).
 
 Grafana is published on `https://<global.observability.grafanaHost>` through the Gateway listener in `httpRoute.parentRefs`; with an external reverse proxy in front, it needs the matching vhost.
 
