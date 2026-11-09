@@ -1,10 +1,10 @@
 ---
-# bound by the chart (grafana.rbac.useExistingRole): the dashboard and datasource sidecars only need ConfigMaps
+# bound by the grafana subchart (rbac.useExistingRole): the dashboard and datasource sidecars only need ConfigMaps
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: grafana-sidecar
-  namespace: monitoring
+  namespace: {{ .Release.Namespace }}
 rules:
   - apiGroups: [""]
     resources: ["configmaps"]

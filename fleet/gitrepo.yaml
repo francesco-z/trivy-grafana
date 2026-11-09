@@ -7,13 +7,14 @@ metadata:
   namespace: fleet-local
 spec:
   branch: main
+  # repo and clientSecretName from values-site.yaml (fleetGitRepo), set at apply time (see README)
   clientSecretName: <fleet-git-auth-secret>
   correctDrift: {}
-  # one bundle per fleet.yaml: rancher-cluster/chart (Helm) and rancher-cluster/manifests (route, egress)
+  # one bundle: the chart, with chart/fleet.yaml
   paths:
-    - kube-prometheus-stack/rancher-cluster
+    - chart
   pollingInterval: 1m0s
-  repo: ssh://git@git.example.org/observability.git
+  repo: <git-repo-url>
   targets:
     - clusterSelector:
         matchExpressions:

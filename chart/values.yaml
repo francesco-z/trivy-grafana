@@ -1,0 +1,145 @@
+# Site values (hostnames, IPs, clusters) go in a separate values file, see values-site.example.yaml.
+
+global:
+  # under global so the kube-prometheus-stack and grafana templates (tpl) can read it
+  observability:
+    # Grafana public hostname: root_url and HTTPRoute
+    grafanaHost: ""
+    # trivy-operator of the cluster where the chart is installed
+    localCluster:
+      enabled: true
+      name: local
+      target: trivy-operator.trivy-system.svc:80
+    # other clusters, trivy-operator scraped through their kube-apiserver service proxy:
+    # - name: cluster label, job trivy-operator-<name>, keys <name>-token/<name>-ca.crt in Secret trivy-metrics
+    #   apiServerName: TLS server name (in the apiserver certificate), allowed as egress FQDN
+    #   address: scrape target, IP or hostname (an IP is allowed as egress /32)
+    clusters: []
+
+# Gateway API route to Grafana
+httpRoute:
+  enabled: false
+  parentRefs: []
+
+# Cilium egress policy for Prometheus (DNS, in-cluster, downstream apiservers)
+ciliumNetworkPolicy:
+  enabled: false
+
+dashboards:
+  enabled: true
+  folder: Trivy
+
+kube-prometheus-stack:
+  # kube-prometheus-stack trimmed to Prometheus + Grafana: only trivy-operator metrics are scraped
+  crds:
+    enabled: true
+
+  defaultRules:
+    create: false
+
+  alertmanager:
+    enabled: false
+
+  kubeStateMetrics:
+    enabled: false
+  nodeExporter:
+    enabled: false
+  kubeApiServer:
+    enabled: false
+  kubelet:
+    enabled: false
+  kubeControllerManager:
+    enabled: false
+  coreDns:
+    enabled: false
+  kubeDns:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeProxy:
+    enabled: false
+
+  prometheusOperator:
+    # certgen job image lives on registry.k8s.io, which is not mirrored
+    admissionWebhooks:
+      enabled: false
+    tls:
+      enabled: false
+
+  prometheus:
+    prometheusSpec:
+      retention: 15d
+      # set to [trivy-metrics] when global.observability.clusters is not empty: mounted at
+      # /etc/prometheus/secrets/trivy-metrics/, keys <cluster>-token and <cluster>-ca.crt, created out of the chart (see README)
+      secrets: []
+      # string, rendered by the chart with tpl: local trivy-operator plus one job per global.observability.clusters entry
+      additionalScrapeConfigs: |
+        {{- with .Values.global.observability.localCluster }}
+        {{- if .enabled }}
+        - job_name: trivy-operator
+          scrape_interval: 60s
+          static_configs:
+            - targets:
+                - {{ .target }}
+              labels:
+                cluster: {{ .name }}
+        {{- end }}
+        {{- end }}
+        {{- range .Values.global.observability.clusters }}
+        # downstream clusters: kube-apiserver service proxy, no exposure of trivy-operator needed
+        - job_name: trivy-operator-{{ .name }}
+          scrape_interval: 60s
+          scheme: https
+          metrics_path: /api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics
+          authorization:
+            credentials_file: /etc/prometheus/secrets/trivy-metrics/{{ .name }}-token
+          tls_config:
+            ca_file: /etc/prometheus/secrets/trivy-metrics/{{ .name }}-ca.crt
+            server_name: {{ .apiServerName }}
+          static_configs:
+            - targets:
+                - {{ .address }}:6443
+              labels:
+                cluster: {{ .name }}
+        {{- end }}
+
+  grafana:
+    enabled: true
+    # credentials from the out-of-chart secret grafana-admin
+    admin:
+      existingSecret: grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+    # k8s dashboards are useless without the disabled exporters
+    defaultDashboardsEnabled: false
+    persistence:
+      enabled: false
+    grafana.ini:
+      server:
+        root_url: '{{ with .Values.global.observability.grafanaHost }}https://{{ . }}{{ else }}%(protocol)s://%(domain)s:%(http_port)s/{{ end }}'
+      # no internet egress: skip the default plugin downloads and update checks on grafana.com
+      plugins:
+        preinstall_disabled: true
+      analytics:
+        reporting_enabled: false
+        check_for_updates: false
+        check_for_plugin_updates: false
+    # sidecars read only ConfigMaps in the release namespace: Role grafana-sidecar from this chart, no cluster-wide secrets access
+    rbac:
+      namespaced: true
+      useExistingRole: grafana-sidecar
+    # dashboards are ConfigMaps from this chart (dashboards/), folder from their grafana_folder annotation
+    sidecar:
+      # 2.14.1 (chart default) has a CRITICAL (certifi) and OS HIGH findings fixed in 2.14.3
+      image:
+        tag: 2.14.3
+      dashboards:
+        searchNamespace: ""  # empty: release namespace only (chart default is ALL)
+        resource: configmap
+        folderAnnotation: grafana_folder
+        provider:
+          foldersFromFilesStructure: true
+      datasources:
+        resource: configmap

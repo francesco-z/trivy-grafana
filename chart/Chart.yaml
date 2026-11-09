@@ -1,0 +1,10 @@
+apiVersion: v2
+name: trivy-observability
+description: Prometheus + Grafana (kube-prometheus-stack, trimmed) with Trivy Operator dashboards for one or more clusters
+type: application
+version: 0.1.0
+dependencies:
+  # upgrade: bump the version, then check its release notes and helm dependency update
+  - name: kube-prometheus-stack
+    version: 92.14.1
+    repository: https://prometheus-community.github.io/helm-charts

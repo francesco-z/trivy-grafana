@@ -4,52 +4,81 @@ Observability stack
 
 ## Trivy Operator metrics in Grafana
 
-Prometheus + Grafana on the Rancher cluster (`kube-prometheus-stack`, trimmed), scraping the trivy-operator `/metrics` of every cluster; series carry a `cluster` label (`rancher`, `cluster-a`, `cluster-b`, `cluster-c`).
+Helm chart `chart/` (`trivy-observability`): a thin wrapper around [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) (dependency pinned in `chart/Chart.yaml`, trimmed to Prometheus + Grafana) that scrapes the trivy-operator `/metrics` of one or more clusters and ships the Trivy dashboards. It runs on any Kubernetes cluster; Fleet is only one way to install it. Series carry a `cluster` label.
 
-- Rancher cluster: in-cluster service `trivy-operator.trivy-system.svc:80`
-- downstream clusters: kube-apiserver service proxy `https://<master-ip>:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics`, with a token of the `kube-system/metrics-reader` ServiceAccount (Role `metrics-reader-trivy-metrics`: `services/proxy` get in `trivy-system`)
+- local cluster: in-cluster service `trivy-operator.trivy-system.svc:80` (`global.observability.localCluster`)
+- other clusters: kube-apiserver service proxy `https://<address>:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics`, with the token of a ServiceAccount allowed `services/proxy` get in `trivy-system` (here the `kube-system/metrics-reader` ServiceAccount and Role `metrics-reader-trivy-metrics` from the `monitoring-network` repo)
 
-| cluster | scraped master | TLS `server_name` |
+Chart additions to kube-prometheus-stack, all in `chart/templates/`:
+
+| template | values | |
 |---|---|---|
-| `cluster-a` | `192.0.2.25` | `cluster-a-cluster-api.example.org` |
-| `cluster-b` | `192.0.2.161` | `cluster-b-cluster-api.example.org` |
-| `cluster-c` | `192.0.2.11` | `cluster-c-cluster-api.example.org` |
+| `dashboards.yaml` | `dashboards.enabled`, `dashboards.folder` | one ConfigMap per `chart/dashboards/*.json`, loaded by the Grafana sidecar |
+| `grafana-sidecar-Role.yaml` | | ConfigMap-only Role used by the Grafana sidecars instead of the chart's cluster-wide ConfigMap/Secret ClusterRole |
+| `httproute.yaml` | `httpRoute.enabled`, `httpRoute.parentRefs` | Gateway API route to Grafana on `global.observability.grafanaHost` |
+| `monitoring-egress-NetworkPolicy.yaml` | `ciliumNetworkPolicy.enabled` | Prometheus egress: DNS, in-cluster, downstream apiservers |
 
-The `<cluster>-cluster-api.example.org` names have no load-balanced address yet, so each cluster is scraped through a single master (one target only: more masters would scrape the same trivy-operator and duplicate the series). The certificate is still verified against the `-api` name, which is in each cluster's `tls-san`. When the apiserver VIPs exist, switch the targets back to the hostnames and drop the `toCIDR` rule from `monitoring-egress-NetworkPolicy.yaml`.
+### Site values
 
-### 1. Downstream RBAC
+Hostnames, IPs, Gateway, git repo and the list of clusters go only in `values-site.yaml`, which is ignored by git; `values-site.example.yaml` documents the keys. Each `global.observability.clusters` entry gives one scrape job and its egress rule:
 
-The `metrics-reader` ServiceAccount and its RBAC come from the `monitoring-network` repo (`metrics-api` GitRepos); copy each token to the Rancher cluster:
+- `name`: `cluster` label, job `trivy-operator-<name>`, keys `<name>-token` / `<name>-ca.crt` in the `trivy-metrics` Secret
+- `apiServerName`: TLS server name (must be in the apiserver certificate, e.g. RKE2 `tls-san`), allowed as egress FQDN
+- `address`: scrape target; an IP is allowed as egress `/32`. Without a load-balanced apiserver address use a single master (one target only: more masters would scrape the same trivy-operator and duplicate the series), then switch to `apiServerName` once a VIP exists.
 
-```bash
-kubectl create namespace monitoring  # on Rancher cluster
+### 1. Secrets
 
-for c in cluster-a cluster-b cluster-c; do
-  kubectl --context "$c" -n kube-system get secret metrics-reader-token -o jsonpath='{.data.token}' | base64 -d > /tmp/token
-  kubectl --context "$c" -n kube-system get secret metrics-reader-token -o jsonpath='{.data.ca\.crt}' | base64 -d > /tmp/ca.crt
-  kubectl --context rancher -n monitoring create secret generic "trivy-metrics-$c" \
-    --from-file=token=/tmp/token --from-file=ca.crt=/tmp/ca.crt
-done
-rm /tmp/token /tmp/ca.crt
-
-# check from outside
-curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
-  --resolve cluster-a-cluster-api.example.org:6443:192.0.2.25 \
-  https://cluster-a-cluster-api.example.org:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics | head
-```
-
-### 2. Rancher cluster
+On the cluster where the chart runs:
 
 ```bash
+kubectl create namespace monitoring
 kubectl -n monitoring create secret generic grafana-admin \
   --from-literal=admin-user=admin --from-literal=admin-password="$(openssl rand -hex 16)"
-
-kubectl apply -f kube-prometheus-stack/kube-prometheus-stack-rancher-cluster.yaml   # GitRepo, fleet-local
 ```
 
-The GitRepo deploys three bundles from `kube-prometheus-stack/rancher-cluster`: `chart/` (the Helm chart, values inline in its `fleet.yaml`), `manifests/` (HTTPRoute, egress CiliumNetworkPolicy and the ConfigMap-only Role `grafana-sidecar` bound by the chart) and `dashboards/` (kustomize: one ConfigMap per dashboard JSON, loaded by the Grafana sidecar). Change values in git, not in the Rancher console. `kube-prometheus-stack/secrets.yaml` is only a template and stays outside the GitRepo path.
+For the other clusters, one Secret `trivy-metrics` with their tokens (kube contexts named like the clusters):
 
-Grafana is published on `https://grafana.example.org` through the Gateway `gateway-system/application` (port 30080 on nodes); the external nginx needs the matching vhost.
+```bash
+args=()
+for c in $(yq -r '.global.observability.clusters[].name' values-site.yaml); do
+  kubectl --context "$c" -n kube-system get secret metrics-reader-token -o jsonpath='{.data.token}' | base64 -d > "/tmp/$c-token"
+  kubectl --context "$c" -n kube-system get secret metrics-reader-token -o jsonpath='{.data.ca\.crt}' | base64 -d > "/tmp/$c-ca.crt"
+  args+=(--from-file="/tmp/$c-token" --from-file="/tmp/$c-ca.crt")
+done
+kubectl -n monitoring create secret generic trivy-metrics "${args[@]}"
+rm /tmp/*-token /tmp/*-ca.crt
+
+# check from outside, values of one cluster from values-site.yaml
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
+  --resolve "$API_SERVER_NAME:6443:$ADDRESS" \
+  "https://$API_SERVER_NAME:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics" | head
+```
+
+`secrets.example.yaml` is the same as manifests.
+
+### 2. Install
+
+With Helm:
+
+```bash
+helm dependency build chart
+helm upgrade --install kube-prometheus-stack chart -n monitoring -f values-site.yaml
+```
+
+With Rancher Fleet (`chart/fleet.yaml`, ignored by Helm): the site values go to the ConfigMap `monitoring/observability-site` read with `helm.valuesFrom`, then the GitRepo `fleet/gitrepo.yaml` gets repo and auth secret from `fleetGitRepo` in the same file:
+
+```bash
+kubectl -n monitoring create configmap observability-site --from-file=values.yaml=values-site.yaml \
+  --dry-run=client -o yaml | kubectl apply -f -
+yq -y --arg repo "$(yq -r '.fleetGitRepo.repo' values-site.yaml)" --arg auth "$(yq -r '.fleetGitRepo.clientSecretName' values-site.yaml)" \
+  '.spec.repo = $repo | .spec.clientSecretName = $auth' fleet/gitrepo.yaml | kubectl apply -f -
+```
+
+Change values in git or in `values-site.yaml` (then re-create the ConfigMap), not in the Rancher console. The release name `kube-prometheus-stack` keeps the resource names of the former plain kube-prometheus-stack install.
+
+Upgrade kube-prometheus-stack: bump `dependencies[0].version` in `chart/Chart.yaml`, run `helm dependency update chart`, commit `Chart.lock`, check the upstream upgrade notes (CRDs).
+
+Grafana is published on `https://<global.observability.grafanaHost>` through the Gateway listener in `httpRoute.parentRefs`; with an external reverse proxy in front, it needs the matching vhost.
 
 ### 3. Dashboards (`Trivy` folder)
 
@@ -64,17 +93,4 @@ Click a CVE, check, image or scorecard number to open the matching drill-down; C
 
 "New CVEs" are Critical/High CVE IDs present now that were never reported for the same cluster in the 7 days before the selected window (24h, 72h on Monday, 7d). A cluster needs at least the window of Prometheus history to be evaluated: Prometheus has no persistent volume, so after a restart the panel stays empty until history builds up again.
 
-The custom dashboards are generated JSON: edit them in Grafana, export, and commit the JSON in `kube-prometheus-stack/rancher-cluster/dashboards/`; a new file also needs an entry in its `kustomization.yaml`.
-
-Manual install:
-
-```bash
-helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-yq '.helm.values' kube-prometheus-stack/rancher-cluster/chart/fleet.yaml \
-  | helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 92.14.1 \
-    -f - --namespace monitoring
-kubectl apply -f kube-prometheus-stack/rancher-cluster/manifests/httproute.yaml \
-  -f kube-prometheus-stack/rancher-cluster/manifests/grafana-sidecar-Role.yaml \
-  -f kube-prometheus-stack/rancher-cluster/manifests/monitoring-egress-NetworkPolicy.yaml
-kubectl apply -k kube-prometheus-stack/rancher-cluster/dashboards
-```
+The custom dashboards are generated JSON: edit them in Grafana, export, and commit the JSON in `chart/dashboards/`; every `*.json` there becomes a ConfigMap.

@@ -1,0 +1,32 @@
+# Copy to values-site.yaml (ignored by git) and fill in.
+global:
+  observability:
+    grafanaHost: grafana.example.org
+    localCluster:
+      name: local
+    clusters:
+      - name: cluster-a
+        apiServerName: cluster-a-api.example.org
+        address: 192.0.2.10
+
+httpRoute:
+  enabled: true
+  parentRefs:
+    - name: <gateway-name>
+      namespace: <gateway-namespace>
+      sectionName: <gateway-listener>
+
+ciliumNetworkPolicy:
+  enabled: true
+
+kube-prometheus-stack:
+  prometheus:
+    prometheusSpec:
+      # needed when clusters is not empty
+      secrets:
+        - trivy-metrics
+
+# only for Fleet (fleet/gitrepo.yaml)
+fleetGitRepo:
+  repo: ssh://git@git.example.org/observability.git
+  clientSecretName: <fleet-git-auth-secret>

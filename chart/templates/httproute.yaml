@@ -1,0 +1,26 @@
+{{- if .Values.httpRoute.enabled }}
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: grafana
+  namespace: {{ .Release.Namespace }}
+spec:
+  hostnames:
+    - {{ required "global.observability.grafanaHost is required with httpRoute.enabled" .Values.global.observability.grafanaHost }}
+  parentRefs:
+    {{- range required "httpRoute.parentRefs is required with httpRoute.enabled" .Values.httpRoute.parentRefs }}
+    - group: gateway.networking.k8s.io
+      kind: Gateway
+      {{- toYaml . | nindent 6 }}
+    {{- end }}
+  rules:
+    - backendRefs:
+        - kind: Service
+          # grafana subchart fullname
+          name: {{ .Release.Name }}-grafana
+          port: 80
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+{{- end }}

@@ -1,0 +1,61 @@
+{{- if .Values.ciliumNetworkPolicy.enabled }}
+{{- $clusters := .Values.global.observability.clusters }}
+---
+apiVersion: "cilium.io/v2"
+kind: CiliumNetworkPolicy
+metadata:
+  name: "prometheus-egress"
+  namespace: {{ .Release.Namespace | quote }}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: prometheus
+  egress:
+    # DNS (with proxy, needed by toFQDNs) and in-cluster targets; redundant where a clusterwide policy allows them
+    - toEndpoints:
+        - matchLabels:
+            io.kubernetes.pod.namespace: kube-system
+            k8s-app: kube-dns
+      toPorts:
+        - ports:
+            - port: "53"
+              protocol: UDP
+            - port: "53"
+              protocol: TCP
+          rules:
+            dns:
+              - matchPattern: "*"
+    - toEntities:
+        - cluster
+    {{- if $clusters }}
+    # downstream kube-apiservers, trivy-operator scraped through the service proxy
+    - toFQDNs:
+        {{- range $clusters }}
+        - matchName: {{ .apiServerName | quote }}
+        {{- if and (ne .address .apiServerName) (not (regexMatch "^[0-9.]+$" .address)) }}
+        - matchName: {{ .address | quote }}
+        {{- end }}
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP
+    {{- end }}
+    {{- $ips := list }}
+    {{- range $clusters }}
+    {{- if regexMatch "^[0-9.]+$" .address }}
+    {{- $ips = append $ips .address }}
+    {{- end }}
+    {{- end }}
+    {{- if $ips }}
+    # clusters scraped by IP (e.g. a single master until an apiserver VIP exists)
+    - toCIDR:
+        {{- range $ips }}
+        - {{ . }}/32
+        {{- end }}
+      toPorts:
+        - ports:
+            - port: "6443"
+              protocol: TCP
+    {{- end }}
+{{- end }}

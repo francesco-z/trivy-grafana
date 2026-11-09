@@ -25,3 +25,9 @@ go.work.sum
 # env file
 .env
 
+
+# site values (hostnames, IPs, repo URL), see values-site.example.yaml
+values-site.yaml
+
+# helm dependency build output (Chart.lock is committed)
+chart/charts/
