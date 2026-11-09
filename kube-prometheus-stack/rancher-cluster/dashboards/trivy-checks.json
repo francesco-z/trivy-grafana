@@ -1,0 +1,543 @@
+{
+  "uid": "trivy-checks",
+  "title": "Trivy - Misconfiguration details",
+  "description": "Failed config audit, RBAC and infra assessment checks with affected resources.",
+  "tags": [
+    "trivy",
+    "security",
+    "misconfigurations"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "links": [
+    {
+      "title": "Trivy",
+      "type": "dashboards",
+      "tags": [
+        "trivy"
+      ],
+      "asDropdown": true,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "type": "query",
+        "name": "cluster",
+        "label": "Cluster",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up{job=~\"trivy-operator.*\"}, cluster)",
+          "refId": "cluster-var"
+        },
+        "definition": "label_values(up{job=~\"trivy-operator.*\"}, cluster)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "query",
+        "name": "namespace",
+        "label": "Namespace",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values({__name__=~\"trivy_configaudits_info|trivy_rbacassessments_info|trivy_infraassessments_info\", cluster=~\"$cluster\"}, namespace)",
+          "refId": "namespace-var"
+        },
+        "definition": "label_values({__name__=~\"trivy_configaudits_info|trivy_rbacassessments_info|trivy_infraassessments_info\", cluster=~\"$cluster\"}, namespace)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "custom",
+        "name": "severity",
+        "label": "Severity",
+        "query": "Critical,High,Medium,Low,Unknown",
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "options": [
+          {
+            "text": "Critical",
+            "value": "Critical",
+            "selected": true
+          },
+          {
+            "text": "High",
+            "value": "High",
+            "selected": true
+          },
+          {
+            "text": "Medium",
+            "value": "Medium",
+            "selected": false
+          },
+          {
+            "text": "Low",
+            "value": "Low",
+            "selected": false
+          },
+          {
+            "text": "Unknown",
+            "value": "Unknown",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": [
+            "Critical",
+            "High"
+          ],
+          "value": [
+            "Critical",
+            "High"
+          ]
+        },
+        "allValue": ".*"
+      },
+      {
+        "type": "query",
+        "name": "check_id",
+        "label": "Check",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "query_result(count by (check_id) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\"))))",
+          "refId": "check_id-var"
+        },
+        "definition": "query_result(count by (check_id) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\"))))",
+        "refresh": 2,
+        "regex": "/check_id=\"([^\"]+)\"/",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "table",
+      "title": "Failed checks",
+      "description": "config = workload manifests (config audit), rbac = Roles, infra = control plane and node settings. Remediation links to the Aqua AVD page of the check.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (report, check_id, severity, category, title, description, check_link) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", config_audit_id=~\"$check_id\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", rbac_assessment_id=~\"$check_id\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", infra_assessment_id=~\"$check_id\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\")))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "report": "Report",
+              "check_id": "Check",
+              "severity": "Severity",
+              "category": "Category",
+              "title": "Title",
+              "description": "Description",
+              "check_link": "Remediation",
+              "Value": "Resources"
+            },
+            "indexByName": {
+              "severity": 0,
+              "report": 1,
+              "check_id": 2,
+              "title": 3,
+              "Value": 4,
+              "description": 5,
+              "check_link": 6,
+              "category": 7
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Check"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Only this check",
+                    "url": "/d/trivy-checks/trivy-misconfiguration-details?${datasource:queryparam}&${cluster:queryparam}&${namespace:queryparam}&var-severity=$__all&var-check_id=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Remediation"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Aqua AVD",
+                    "url": "${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "data-links"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Description"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 500
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Resources",
+            "desc": true
+          }
+        ]
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      }
+    },
+    {
+      "type": "table",
+      "title": "Affected resources",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, namespace, resource_kind, resource_name, report, check_id, severity, title) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", config_audit_id=~\"$check_id\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", rbac_assessment_id=~\"$check_id\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", infra_assessment_id=~\"$check_id\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\")))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "namespace": "Namespace",
+              "resource_kind": "Kind",
+              "resource_name": "Name",
+              "report": "Report",
+              "check_id": "Check",
+              "severity": "Severity",
+              "title": "Title"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "namespace": 1,
+              "resource_kind": 2,
+              "resource_name": 3,
+              "severity": 4,
+              "report": 5,
+              "check_id": 6,
+              "title": 7
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 12
+      }
+    }
+  ]
+}

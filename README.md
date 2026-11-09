@@ -47,9 +47,24 @@ kubectl -n monitoring create secret generic grafana-admin \
 kubectl apply -f kube-prometheus-stack/kube-prometheus-stack-rancher-cluster.yaml   # GitRepo, fleet-local
 ```
 
-The GitRepo deploys two bundles from `kube-prometheus-stack/rancher-cluster`: `chart/` (the Helm chart, values inline in its `fleet.yaml`) and `manifests/` (HTTPRoute and egress CiliumNetworkPolicy). Change values in git, not in the Rancher console. `kube-prometheus-stack/secrets.yaml` is only a template and stays outside the GitRepo path.
+The GitRepo deploys three bundles from `kube-prometheus-stack/rancher-cluster`: `chart/` (the Helm chart, values inline in its `fleet.yaml`), `manifests/` (HTTPRoute and egress CiliumNetworkPolicy) and `dashboards/` (kustomize: one ConfigMap per dashboard JSON, loaded by the Grafana sidecar). Change values in git, not in the Rancher console. `kube-prometheus-stack/secrets.yaml` is only a template and stays outside the GitRepo path.
 
-Grafana is published on `https://grafana.example.org` through the Gateway `gateway-system/application` (port 30080 on nodes); the external nginx needs the matching vhost. The Trivy Operator dashboard ([17813](https://grafana.com/grafana/dashboards/17813-trivy-operator-dashboard/)) is provisioned in the `Trivy` folder.
+Grafana is published on `https://grafana.example.org` through the Gateway `gateway-system/application` (port 30080 on nodes); the external nginx needs the matching vhost.
+
+### 3. Dashboards (`Trivy` folder)
+
+| dashboard | use |
+|---|---|
+| Trivy - Security overview | morning report: scorecard per cluster (unique Critical/High CVEs, new CVEs, workloads with critical CVEs, Critical/High misconfigurations, exposed secrets, failed compliance controls, end-of-life OS images, scrape status), new CVEs table, CVEs and failed checks to fix, compliance, 7-day trend |
+| Trivy - Vulnerability details | drill-down by cluster/namespace/image/CVE: title, severity, score, package, installed and fixed version, published date, primary link, affected workloads, vulnerable images |
+| Trivy - Misconfiguration details | drill-down on failed config audit, RBAC and infra checks: description, remediation link (Aqua AVD), affected resources |
+| Trivy Operator - Vulnerabilities | Grafana.com [16337](https://grafana.com/grafana/dashboards/16337) rev 16, vendored with the `cluster`/`namespace` variables patched to trivy-operator metrics (the original reads kube-state-metrics, not scraped here) |
+
+Click a CVE, check, image or scorecard number to open the matching drill-down; CVE cells also link to NVD and OSV. The primary link is rebuilt from the ID (Aqua AVD for CVEs, as in the Trivy report; GitHub for GHSA; OSV otherwise) because trivy-operator does not export it as a metric.
+
+"New CVEs" are Critical/High CVE IDs present now that were never reported for the same cluster in the 7 days before the selected window (24h, 72h on Monday, 7d). A cluster needs at least the window of Prometheus history to be evaluated: Prometheus has no persistent volume, so after a restart the panel stays empty until history builds up again.
+
+The custom dashboards are generated JSON: edit them in Grafana, export, and commit the JSON in `kube-prometheus-stack/rancher-cluster/dashboards/`; a new file also needs an entry in its `kustomization.yaml`.
 
 Manual install:
 
@@ -60,4 +75,5 @@ yq '.helm.values' kube-prometheus-stack/rancher-cluster/chart/fleet.yaml \
     -f - --namespace monitoring
 kubectl apply -f kube-prometheus-stack/rancher-cluster/manifests/httproute.yaml \
   -f kube-prometheus-stack/rancher-cluster/manifests/monitoring-egress-NetworkPolicy.yaml
+kubectl apply -k kube-prometheus-stack/rancher-cluster/dashboards
 ```

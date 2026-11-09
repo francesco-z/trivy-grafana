@@ -1,0 +1,925 @@
+{
+  "uid": "trivy-vulnerabilities",
+  "title": "Trivy - Vulnerability details",
+  "description": "Drill-down on CVEs: title, severity, score, fixed version, primary link and affected workloads.",
+  "tags": [
+    "trivy",
+    "security",
+    "vulnerabilities"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-24h",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "links": [
+    {
+      "title": "Trivy",
+      "type": "dashboards",
+      "tags": [
+        "trivy"
+      ],
+      "asDropdown": true,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "type": "query",
+        "name": "cluster",
+        "label": "Cluster",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up{job=~\"trivy-operator.*\"}, cluster)",
+          "refId": "cluster-var"
+        },
+        "definition": "label_values(up{job=~\"trivy-operator.*\"}, cluster)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "query",
+        "name": "namespace",
+        "label": "Namespace",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(trivy_image_info{cluster=~\"$cluster\"}, namespace)",
+          "refId": "namespace-var"
+        },
+        "definition": "label_values(trivy_image_info{cluster=~\"$cluster\"}, namespace)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "custom",
+        "name": "severity",
+        "label": "Severity",
+        "query": "Critical,High,Medium,Low,Unknown",
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "options": [
+          {
+            "text": "Critical",
+            "value": "Critical",
+            "selected": true
+          },
+          {
+            "text": "High",
+            "value": "High",
+            "selected": true
+          },
+          {
+            "text": "Medium",
+            "value": "Medium",
+            "selected": false
+          },
+          {
+            "text": "Low",
+            "value": "Low",
+            "selected": false
+          },
+          {
+            "text": "Unknown",
+            "value": "Unknown",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": [
+            "Critical",
+            "High"
+          ],
+          "value": [
+            "Critical",
+            "High"
+          ]
+        },
+        "allValue": ".*"
+      },
+      {
+        "type": "query",
+        "name": "image",
+        "label": "Image",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(trivy_image_info{cluster=~\"$cluster\", namespace=~\"$namespace\"}, image_repository)",
+          "refId": "image-var"
+        },
+        "definition": "label_values(trivy_image_info{cluster=~\"$cluster\", namespace=~\"$namespace\"}, image_repository)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "query",
+        "name": "vuln_id",
+        "label": "CVE",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(trivy_vulnerability_id{cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", image_repository=~\"$image\"}, vuln_id)",
+          "refId": "vuln_id-var"
+        },
+        "definition": "label_values(trivy_vulnerability_id{cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", image_repository=~\"$image\"}, vuln_id)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "table",
+      "title": "Vulnerabilities",
+      "description": "Title, severity, CVSS score, installed and fixed version per package. Primary link: Aqua AVD for CVEs (as in the Trivy report), GitHub for GHSA, OSV otherwise. Select a CVE in the variables or click it.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (vuln_id, severity, vuln_score, vuln_title, resource, installed_version, fixed_version, published_date, primary_link) (label_replace(label_replace(label_replace(trivy_vulnerability_id{cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", image_repository=~\"$image\", vuln_id=~\"$vuln_id\"}, \"primary_link\", \"https://osv.dev/vulnerability/$1\", \"vuln_id\", \"(.+)\"), \"primary_link\", \"https://github.com/advisories/$1\", \"vuln_id\", \"(GHSA-.+)\"), \"primary_link\", \"https://avd.aquasec.com/nvd/cve-$1\", \"vuln_id\", \"CVE-(.+)\"))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "vuln_id": "CVE",
+              "severity": "Severity",
+              "vuln_score": "Score",
+              "vuln_title": "Title",
+              "resource": "Package",
+              "installed_version": "Installed",
+              "fixed_version": "Fixed in",
+              "published_date": "Published",
+              "primary_link": "Primary link",
+              "Value": "Affected containers"
+            },
+            "indexByName": {
+              "vuln_id": 0,
+              "severity": 1,
+              "vuln_score": 2,
+              "vuln_title": 3,
+              "resource": 4,
+              "installed_version": 5,
+              "fixed_version": 6,
+              "published_date": 7,
+              "primary_link": 8,
+              "Value": 9
+            }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "Score",
+                "destinationType": "number"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Only this CVE",
+                    "url": "/d/trivy-vulnerabilities/trivy-vulnerability-details?${datasource:queryparam}&${cluster:queryparam}&${namespace:queryparam}&var-severity=$__all&var-image=$__all&var-vuln_id=${__value.raw}"
+                  },
+                  {
+                    "title": "NVD",
+                    "url": "https://nvd.nist.gov/vuln/detail/${__value.raw}",
+                    "targetBlank": true
+                  },
+                  {
+                    "title": "OSV",
+                    "url": "https://osv.dev/vulnerability/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Primary link"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "${__value.raw}",
+                    "url": "${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "data-links"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 4
+                    },
+                    {
+                      "color": "orange",
+                      "value": 7
+                    },
+                    {
+                      "color": "red",
+                      "value": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fixed in"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "no fix",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 450
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Score",
+            "desc": true
+          }
+        ]
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 10
+      }
+    },
+    {
+      "type": "table",
+      "title": "Affected workloads",
+      "description": "Where each vulnerability is deployed. Target = file or OS layer where the package was found.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, namespace, resource_kind, resource_name, container_name, image_registry, image_repository, image_tag, vuln_id, severity, resource, installed_version, fixed_version, target, class) (trivy_vulnerability_id{cluster=~\"$cluster\", namespace=~\"$namespace\", severity=~\"$severity\", image_repository=~\"$image\", vuln_id=~\"$vuln_id\"})",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "namespace": "Namespace",
+              "resource_kind": "Kind",
+              "resource_name": "Workload",
+              "container_name": "Container",
+              "image_registry": "Registry",
+              "image_repository": "Image",
+              "image_tag": "Tag",
+              "vuln_id": "CVE",
+              "severity": "Severity",
+              "resource": "Package",
+              "installed_version": "Installed",
+              "fixed_version": "Fixed in",
+              "target": "Target",
+              "class": "Class"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "namespace": 1,
+              "resource_kind": 2,
+              "resource_name": 3,
+              "container_name": 4,
+              "image_registry": 5,
+              "image_repository": 6,
+              "image_tag": 7,
+              "vuln_id": 8,
+              "severity": 9,
+              "resource": 10,
+              "installed_version": 11,
+              "fixed_version": 12,
+              "target": 13,
+              "class": 14
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "NVD",
+                    "url": "https://nvd.nist.gov/vuln/detail/${__value.raw}",
+                    "targetBlank": true
+                  },
+                  {
+                    "title": "OSV",
+                    "url": "https://osv.dev/vulnerability/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fixed in"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "no fix",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 10,
+        "w": 24,
+        "h": 10
+      }
+    },
+    {
+      "type": "table",
+      "title": "Vulnerable images",
+      "description": "Vulnerability count per image (Medium is 0 when the operator scans only HIGH,CRITICAL).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (cluster, image_registry, image_repository, image_tag) (trivy_image_vulnerabilities{cluster=~\"$cluster\", namespace=~\"$namespace\", image_repository=~\"$image\", severity=\"Critical\"})",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (cluster, image_registry, image_repository, image_tag) (trivy_image_vulnerabilities{cluster=~\"$cluster\", namespace=~\"$namespace\", image_repository=~\"$image\", severity=\"High\"})",
+          "refId": "B",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (cluster, image_registry, image_repository, image_tag) (trivy_image_vulnerabilities{cluster=~\"$cluster\", namespace=~\"$namespace\", image_repository=~\"$image\", severity=\"Medium\"})",
+          "refId": "C",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "image_registry": "Registry",
+              "image_repository": "Image",
+              "image_tag": "Tag",
+              "Value #A": "Critical",
+              "Value #B": "High",
+              "Value #C": "Medium"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "image_registry": 1,
+              "image_repository": 2,
+              "image_tag": 3,
+              "Value #A": 4,
+              "Value #B": 5,
+              "Value #C": 6
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Image"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Only this image",
+                    "url": "/d/trivy-vulnerabilities/trivy-vulnerability-details?${datasource:queryparam}&${cluster:queryparam}&${namespace:queryparam}&${severity:queryparam}&var-vuln_id=$__all&var-image=${__value.raw}"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Critical"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Critical",
+            "desc": true
+          }
+        ]
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 24,
+        "h": 9
+      }
+    }
+  ]
+}

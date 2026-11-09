@@ -1,0 +1,4 @@
+defaultNamespace: monitoring
+# kustomization.yaml turns the dashboard JSON files into ConfigMaps
+kustomize:
+  dir: ./

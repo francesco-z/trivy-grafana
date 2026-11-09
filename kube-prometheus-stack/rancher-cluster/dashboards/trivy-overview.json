@@ -1,0 +1,2102 @@
+{
+  "uid": "trivy-overview",
+  "title": "Trivy - Security overview",
+  "description": "Daily security report from trivy-operator on every cluster: new CVEs, critical findings to fix, compliance.",
+  "tags": [
+    "trivy",
+    "security",
+    "overview"
+  ],
+  "editable": true,
+  "graphTooltip": 1,
+  "schemaVersion": 41,
+  "version": 1,
+  "refresh": "",
+  "time": {
+    "from": "now-7d",
+    "to": "now"
+  },
+  "timezone": "browser",
+  "links": [
+    {
+      "title": "Trivy",
+      "type": "dashboards",
+      "tags": [
+        "trivy"
+      ],
+      "asDropdown": true,
+      "includeVars": false,
+      "keepTime": true
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "type": "datasource",
+        "name": "datasource",
+        "label": "Data source",
+        "query": "prometheus",
+        "current": {
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
+        "hide": 0,
+        "refresh": 1
+      },
+      {
+        "type": "query",
+        "name": "cluster",
+        "label": "Cluster",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up{job=~\"trivy-operator.*\"}, cluster)",
+          "refId": "cluster-var"
+        },
+        "definition": "label_values(up{job=~\"trivy-operator.*\"}, cluster)",
+        "refresh": 2,
+        "regex": "",
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "allValue": ".*",
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        }
+      },
+      {
+        "type": "custom",
+        "name": "severity",
+        "label": "Severity",
+        "query": "Critical,High,Medium,Low,Unknown",
+        "multi": true,
+        "includeAll": true,
+        "hide": 0,
+        "options": [
+          {
+            "text": "Critical",
+            "value": "Critical",
+            "selected": true
+          },
+          {
+            "text": "High",
+            "value": "High",
+            "selected": true
+          },
+          {
+            "text": "Medium",
+            "value": "Medium",
+            "selected": false
+          },
+          {
+            "text": "Low",
+            "value": "Low",
+            "selected": false
+          },
+          {
+            "text": "Unknown",
+            "value": "Unknown",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": [
+            "Critical",
+            "High"
+          ],
+          "value": [
+            "Critical",
+            "High"
+          ]
+        },
+        "allValue": ".*"
+      },
+      {
+        "type": "custom",
+        "name": "new_window",
+        "label": "New since",
+        "query": "24h,72h,7d",
+        "multi": false,
+        "includeAll": false,
+        "hide": 0,
+        "options": [
+          {
+            "text": "24h",
+            "value": "24h",
+            "selected": true
+          },
+          {
+            "text": "72h",
+            "value": "72h",
+            "selected": false
+          },
+          {
+            "text": "7d",
+            "value": "7d",
+            "selected": false
+          }
+        ],
+        "current": {
+          "text": "24h",
+          "value": "24h"
+        }
+      }
+    ]
+  },
+  "annotations": {
+    "list": []
+  },
+  "panels": [
+    {
+      "type": "row",
+      "title": "Morning scorecard (one row per cluster, click a number to drill down)",
+      "collapsed": false,
+      "panels": [],
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "table",
+      "title": "Cluster scorecard",
+      "description": "Unique CVE IDs per cluster (Critical/High), failed checks (config audit + RBAC + infra), secrets found in images, failed compliance controls (sum over all specs), images on end-of-life OS. Scrape = whether Prometheus can reach the trivy-operator of the cluster: if DOWN the numbers are stale or missing. New CVEs: Critical/High CVE IDs not seen in the cluster during the 7d before the window (empty while Prometheus has less history).",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, vuln_id) (trivy_vulnerability_id{cluster=~\"$cluster\", severity=\"Critical\"})) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, vuln_id) (trivy_vulnerability_id{cluster=~\"$cluster\", severity=\"High\"})) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "B",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, vuln_id) ((trivy_vulnerability_id{cluster=~\"$cluster\", severity=~\"Critical|High\"} unless on (cluster, vuln_id) last_over_time(trivy_vulnerability_id{cluster=~\"$cluster\"}[7d] offset $new_window) and on (cluster) (max_over_time(up{job=~\"trivy-operator.*\"}[7d] offset $new_window) == 1)))) or on (cluster) (group by (cluster) (max_over_time(up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}[7d] offset $new_window)) * 0)",
+          "refId": "C",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, namespace, resource_kind, resource_name) (trivy_vulnerability_id{cluster=~\"$cluster\", severity=\"Critical\"})) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "D",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", severity=\"Critical\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", severity=\"Critical\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", severity=\"Critical\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\"))) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "E",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", severity=\"High\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", severity=\"High\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", severity=\"High\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\"))) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "F",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (cluster) (trivy_image_exposedsecrets{cluster=~\"$cluster\"}) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "G",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (cluster) (trivy_cluster_compliance{cluster=~\"$cluster\", status=\"Fail\"}) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "H",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, image_repository, image_tag) (trivy_image_info{cluster=~\"$cluster\", image_os_eosl=\"true\"})) or (group by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"}) * 0)",
+          "refId": "I",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "max by (cluster) (up{job=~\"trivy-operator.*\", cluster=~\"$cluster\"})",
+          "refId": "J",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "Value #A": "Critical CVEs",
+              "Value #B": "High CVEs",
+              "Value #C": "New CVEs ($new_window)",
+              "Value #D": "Workloads w/ critical CVEs",
+              "Value #E": "Critical misconfigurations",
+              "Value #F": "High misconfigurations",
+              "Value #G": "Exposed secrets",
+              "Value #H": "Failed compliance controls",
+              "Value #I": "End-of-life OS images",
+              "Value #J": "Scrape",
+              "cluster": "Cluster"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "Value #A": 1,
+              "Value #B": 2,
+              "Value #C": 3,
+              "Value #D": 4,
+              "Value #E": 5,
+              "Value #F": 6,
+              "Value #G": 7,
+              "Value #H": 8,
+              "Value #I": 9,
+              "Value #J": 10
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Critical CVEs"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Critical CVEs",
+                    "url": "/d/trivy-vulnerabilities/trivy-vulnerability-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=Critical&var-namespace=$__all&var-image=$__all&var-vuln_id=$__all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High CVEs"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "High CVEs",
+                    "url": "/d/trivy-vulnerabilities/trivy-vulnerability-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=High&var-namespace=$__all&var-image=$__all&var-vuln_id=$__all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "New CVEs ($new_window)"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Workloads w/ critical CVEs"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Critical misconfigurations"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Critical misconfigurations",
+                    "url": "/d/trivy-checks/trivy-misconfiguration-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=Critical&var-namespace=$__all&var-check_id=$__all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "High misconfigurations"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              },
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "High misconfigurations",
+                    "url": "/d/trivy-checks/trivy-misconfiguration-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=High&var-namespace=$__all&var-check_id=$__all"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Exposed secrets"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "red",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed compliance controls"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "End-of-life OS images"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Scrape"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "OK",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "0": {
+                        "text": "DOWN",
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 0,
+        "y": 1,
+        "w": 24,
+        "h": 7
+      }
+    },
+    {
+      "type": "row",
+      "title": "New CVEs since $new_window",
+      "collapsed": false,
+      "panels": [],
+      "id": 3,
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "table",
+      "title": "New CVEs (not seen in the cluster before the last $new_window)",
+      "description": "CVE IDs present now that were never reported for the same cluster in the 7d before the selected window. Click a CVE for details and affected workloads.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, vuln_id, severity, vuln_score, vuln_title, published_date) ((trivy_vulnerability_id{cluster=~\"$cluster\", severity=~\"$severity\"} unless on (cluster, vuln_id) last_over_time(trivy_vulnerability_id{cluster=~\"$cluster\"}[7d] offset $new_window) and on (cluster) (max_over_time(up{job=~\"trivy-operator.*\"}[7d] offset $new_window) == 1)))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "vuln_id": "CVE",
+              "severity": "Severity",
+              "vuln_score": "Score",
+              "vuln_title": "Title",
+              "published_date": "Published",
+              "Value": "Affected containers"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "vuln_id": 1,
+              "severity": 2,
+              "vuln_score": 3,
+              "vuln_title": 4,
+              "published_date": 5,
+              "Value": 6
+            }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "Score",
+                "destinationType": "number"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Vulnerability details",
+                    "url": "/d/trivy-vulnerabilities/trivy-vulnerability-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=$__all&var-namespace=$__all&var-image=$__all&var-vuln_id=${__value.raw}"
+                  },
+                  {
+                    "title": "NVD",
+                    "url": "https://nvd.nist.gov/vuln/detail/${__value.raw}",
+                    "targetBlank": true
+                  },
+                  {
+                    "title": "OSV",
+                    "url": "https://osv.dev/vulnerability/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 4
+                    },
+                    {
+                      "color": "orange",
+                      "value": 7
+                    },
+                    {
+                      "color": "red",
+                      "value": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Title"
+            },
+            "properties": [
+              {
+                "id": "custom.width",
+                "value": 600
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Score",
+            "desc": true
+          }
+        ]
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 0,
+        "y": 9,
+        "w": 24,
+        "h": 9
+      }
+    },
+    {
+      "type": "row",
+      "title": "To fix",
+      "collapsed": false,
+      "panels": [],
+      "id": 5,
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "table",
+      "title": "Open CVEs ($severity) by package",
+      "description": "One row per CVE and package version: upgrade the package to 'Fixed in'.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, vuln_id, severity, vuln_score, vuln_title, resource, installed_version, fixed_version) (trivy_vulnerability_id{cluster=~\"$cluster\", severity=~\"$severity\"})",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "vuln_id": "CVE",
+              "severity": "Severity",
+              "vuln_score": "Score",
+              "vuln_title": "Title",
+              "resource": "Package",
+              "installed_version": "Installed",
+              "fixed_version": "Fixed in",
+              "Value": "Affected containers"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "vuln_id": 1,
+              "severity": 2,
+              "vuln_score": 3,
+              "resource": 4,
+              "installed_version": 5,
+              "fixed_version": 6,
+              "Value": 7,
+              "vuln_title": 8
+            }
+          }
+        },
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "targetField": "Score",
+                "destinationType": "number"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "CVE"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Vulnerability details",
+                    "url": "/d/trivy-vulnerabilities/trivy-vulnerability-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=$__all&var-namespace=$__all&var-image=$__all&var-vuln_id=${__value.raw}"
+                  },
+                  {
+                    "title": "NVD",
+                    "url": "https://nvd.nist.gov/vuln/detail/${__value.raw}",
+                    "targetBlank": true
+                  },
+                  {
+                    "title": "OSV",
+                    "url": "https://osv.dev/vulnerability/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Score"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 1
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "yellow",
+                      "value": 4
+                    },
+                    {
+                      "color": "orange",
+                      "value": 7
+                    },
+                    {
+                      "color": "red",
+                      "value": 9
+                    }
+                  ]
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Fixed in"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "special",
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "text": "no fix",
+                        "index": 0
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Score",
+            "desc": true
+          }
+        ]
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 0,
+        "y": 19,
+        "w": 14,
+        "h": 12
+      }
+    },
+    {
+      "type": "table",
+      "title": "Failed checks ($severity)",
+      "description": "Failed config audit (workloads), RBAC (roles) and infra (control plane / nodes) checks. Click a check for remediation and affected resources.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, report, severity, check_id, title) ((label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_configaudits_info{config_audit_success=\"false\", cluster=~\"$cluster\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"config_audit_id\", \"(.*)\"), \"title\", \"$1\", \"config_audit_title\", \"(.*)\"), \"description\", \"$1\", \"config_audit_description\", \"(.*)\"), \"category\", \"$1\", \"config_audit_category\", \"(.*)\"), \"report\", \"config\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_rbacassessments_info{rbac_assessment_success=\"false\", cluster=~\"$cluster\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"rbac_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"rbac_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"rbac_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"rbac_assessment_category\", \"(.*)\"), \"report\", \"rbac\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\") or label_replace(label_replace(label_replace(label_replace(label_replace(label_replace(trivy_infraassessments_info{infra_assessment_success=\"false\", cluster=~\"$cluster\", severity=~\"$severity\"}, \"check_id\", \"$1\", \"infra_assessment_id\", \"(.*)\"), \"title\", \"$1\", \"infra_assessment_title\", \"(.*)\"), \"description\", \"$1\", \"infra_assessment_description\", \"(.*)\"), \"category\", \"$1\", \"infra_assessment_category\", \"(.*)\"), \"report\", \"infra\", \"\", \"\"), \"check_link\", \"https://avd.aquasec.com/misconfig/$1\", \"check_id\", \"(.+)\")))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "report": "Report",
+              "severity": "Severity",
+              "check_id": "Check",
+              "title": "Title",
+              "Value": "Resources"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "severity": 1,
+              "report": 2,
+              "check_id": 3,
+              "title": 4,
+              "Value": 5
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Check"
+            },
+            "properties": [
+              {
+                "id": "links",
+                "value": [
+                  {
+                    "title": "Misconfiguration details",
+                    "url": "/d/trivy-checks/trivy-misconfiguration-details?${datasource:queryparam}&var-cluster=${__data.fields.cluster}&var-severity=$__all&var-namespace=$__all&var-check_id=${__value.raw}"
+                  },
+                  {
+                    "title": "Aqua AVD",
+                    "url": "https://avd.aquasec.com/misconfig/${__value.raw}",
+                    "targetBlank": true
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Resources"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Resources",
+            "desc": true
+          }
+        ]
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 14,
+        "y": 19,
+        "w": 10,
+        "h": 12
+      }
+    },
+    {
+      "type": "row",
+      "title": "Compliance, secrets, end-of-life images",
+      "collapsed": false,
+      "panels": [],
+      "id": 8,
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "table",
+      "title": "Compliance (summary reports)",
+      "description": "Cluster compliance reports (CIS, NSA, Pod Security Standards) refreshed every 6h.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (cluster, title) (trivy_cluster_compliance{cluster=~\"$cluster\", status=\"Pass\"}) / sum by (cluster, title) (trivy_cluster_compliance{cluster=~\"$cluster\"}) * 100",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (cluster, title) (trivy_cluster_compliance{cluster=~\"$cluster\", status=\"Fail\"})",
+          "refId": "B",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "title": "Spec",
+              "Value #A": "Passed",
+              "Value #B": "Failed controls"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "title": 1,
+              "Value #A": 2,
+              "Value #B": 3
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Passed"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "percent"
+              },
+              {
+                "id": "min",
+                "value": 0
+              },
+              {
+                "id": "max",
+                "value": 100
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "gauge",
+                  "mode": "basic"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "red",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 70
+                    },
+                    {
+                      "color": "green",
+                      "value": 90
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 10,
+        "h": 9
+      }
+    },
+    {
+      "type": "table",
+      "title": "Failed compliance controls",
+      "description": "",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, title, compliance_id, compliance_name, severity) (trivy_compliance_info{cluster=~\"$cluster\", status=\"Fail\", severity=~\"(?i)${severity:regex}\"})",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "title": "Spec",
+              "compliance_id": "ID",
+              "compliance_name": "Control",
+              "severity": "Severity"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "title": 1,
+              "compliance_id": 2,
+              "compliance_name": 3,
+              "severity": 4
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 10,
+        "y": 32,
+        "w": 14,
+        "h": 9
+      }
+    },
+    {
+      "type": "table",
+      "title": "Images with exposed secrets",
+      "description": "Secrets (keys, tokens, passwords) found in container image layers.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "sum by (cluster, namespace, resource_kind, resource_name, container_name, image_repository, image_tag, severity) (trivy_image_exposedsecrets{cluster=~\"$cluster\"}) > 0",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "namespace": "Namespace",
+              "resource_kind": "Kind",
+              "resource_name": "Workload",
+              "container_name": "Container",
+              "image_repository": "Image",
+              "image_tag": "Tag",
+              "severity": "Severity",
+              "Value": "Secrets"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "namespace": 1,
+              "resource_kind": 2,
+              "resource_name": 3,
+              "container_name": 4,
+              "image_repository": 5,
+              "image_tag": 6,
+              "severity": 7,
+              "Value": 8
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Severity"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Critical": {
+                        "color": "dark-red",
+                        "index": 0
+                      },
+                      "CRITICAL": {
+                        "color": "dark-red",
+                        "index": 1
+                      },
+                      "High": {
+                        "color": "orange",
+                        "index": 2
+                      },
+                      "HIGH": {
+                        "color": "orange",
+                        "index": 3
+                      },
+                      "Medium": {
+                        "color": "yellow",
+                        "index": 4
+                      },
+                      "MEDIUM": {
+                        "color": "yellow",
+                        "index": 5
+                      },
+                      "Low": {
+                        "color": "blue",
+                        "index": 6
+                      },
+                      "LOW": {
+                        "color": "blue",
+                        "index": 7
+                      },
+                      "Unknown": {
+                        "color": "text",
+                        "index": 8
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text",
+                  "mode": "basic"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 0,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "table",
+      "title": "Images on end-of-life OS",
+      "description": "Base OS no longer receives security fixes: rebuild on a supported base image.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster, image_repository, image_tag, image_os_family, image_os_name) (trivy_image_info{cluster=~\"$cluster\", image_os_eosl=\"true\"})",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": true,
+          "range": false,
+          "format": "table"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true
+            },
+            "renameByName": {
+              "cluster": "Cluster",
+              "image_repository": "Image",
+              "image_tag": "Tag",
+              "image_os_family": "OS",
+              "image_os_name": "Version",
+              "Value": "Containers"
+            },
+            "indexByName": {
+              "cluster": 0,
+              "image_repository": 1,
+              "image_tag": 2,
+              "image_os_family": 3,
+              "image_os_name": 4,
+              "Value": 5
+            }
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "filterable": true,
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": true
+          },
+          "noValue": "-"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false,
+          "reducer": [
+            "sum"
+          ],
+          "fields": "",
+          "countRows": false
+        }
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 12,
+        "y": 41,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "row",
+      "title": "Trend",
+      "collapsed": false,
+      "panels": [],
+      "id": 13,
+      "gridPos": {
+        "x": 0,
+        "y": 49,
+        "w": 24,
+        "h": 1
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Unique Critical CVEs per cluster",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, vuln_id) (trivy_vulnerability_id{cluster=~\"$cluster\", severity=\"Critical\"}))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "format": "time_series",
+          "legendFormat": "{{cluster}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true
+          },
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 14,
+      "gridPos": {
+        "x": 0,
+        "y": 50,
+        "w": 12,
+        "h": 8
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Unique High CVEs per cluster",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "count by (cluster) (count by (cluster, vuln_id) (trivy_vulnerability_id{cluster=~\"$cluster\", severity=\"High\"}))",
+          "refId": "A",
+          "editorMode": "code",
+          "instant": false,
+          "range": true,
+          "format": "time_series",
+          "legendFormat": "{{cluster}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "spanNulls": true
+          },
+          "decimals": 0,
+          "min": 0
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "id": 15,
+      "gridPos": {
+        "x": 12,
+        "y": 50,
+        "w": 12,
+        "h": 8
+      }
+    }
+  ]
+}

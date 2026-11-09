@@ -119,22 +119,9 @@ helm:
       grafana.ini:
         server:
           root_url: https://grafana.example.org
-      dashboardProviders:
-        dashboardproviders.yaml:
-          apiVersion: 1
-          providers:
-            - name: trivy
-              orgId: 1
-              folder: Trivy
-              type: file
-              disableDeletion: true
-              editable: true
-              options:
-                path: /var/lib/grafana/dashboards/trivy
-      dashboards:
-        trivy:
-          trivy-operator:
-            # https://grafana.com/grafana/dashboards/17813-trivy-operator-dashboard/
-            gnetId: 17813
-            revision: 2
-            datasource: Prometheus
+      # dashboards are ConfigMaps from the rancher-cluster/dashboards bundle, folder from their grafana_folder annotation
+      sidecar:
+        dashboards:
+          folderAnnotation: grafana_folder
+          provider:
+            foldersFromFilesStructure: true
