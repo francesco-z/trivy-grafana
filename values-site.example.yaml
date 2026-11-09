@@ -28,5 +28,5 @@ kube-prometheus-stack:
 
 # only for Fleet (fleet/gitrepo.yaml)
 fleetGitRepo:
-  repo: ssh://git@git.example.org/observability.git
+  repo: ssh://git@git.example.org/trivy-grafana.git
   clientSecretName: <fleet-git-auth-secret>

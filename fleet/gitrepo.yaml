@@ -2,8 +2,8 @@ apiVersion: fleet.cattle.io/v1alpha1
 kind: GitRepo
 metadata:
   annotations:
-    field.cattle.io/description: Prometheus + Grafana for trivy-operator metrics
-  name: kube-prometheus-stack
+    field.cattle.io/description: trivy-grafana, everyday CVE console (Prometheus + Grafana for trivy-operator metrics)
+  name: trivy-grafana
   namespace: fleet-local
 spec:
   branch: main

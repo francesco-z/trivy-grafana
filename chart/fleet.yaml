@@ -3,9 +3,9 @@ defaultNamespace: monitoring
 helm:
   # same release name as before the umbrella chart: resource names stay kube-prometheus-stack-*
   releaseName: kube-prometheus-stack
-  # site values (values-site.yaml, not in git) from the ConfigMap observability-site, see README
+  # site values (values-site.yaml, not in git) from the ConfigMap trivy-grafana-site, see README
   valuesFrom:
     - configMapKeyRef:
-        name: observability-site
+        name: trivy-grafana-site
         namespace: monitoring
         key: values.yaml

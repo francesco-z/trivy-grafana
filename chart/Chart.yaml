@@ -1,6 +1,6 @@
 apiVersion: v2
-name: trivy-observability
-description: Prometheus + Grafana (kube-prometheus-stack, trimmed) with Trivy Operator dashboards for one or more clusters
+name: trivy-grafana
+description: Everyday CVE console - Prometheus + Grafana (kube-prometheus-stack, trimmed) with Trivy Operator dashboards for one or more clusters
 type: application
 version: 0.1.0
 dependencies:

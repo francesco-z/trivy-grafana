@@ -1,10 +1,10 @@
-# observability
+# trivy-grafana
 
-Observability stack
+Everyday CVE console: Prometheus + Grafana (a trimmed kube-prometheus-stack) collecting Trivy Operator results from every cluster, so the security team opens one Grafana folder each morning and sees new CVEs, what to fix and where.
 
 ## Trivy Operator metrics in Grafana
 
-Helm chart `chart/` (`trivy-observability`): a thin wrapper around [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) (dependency pinned in `chart/Chart.yaml`, trimmed to Prometheus + Grafana) that scrapes the trivy-operator `/metrics` of one or more clusters and ships the Trivy dashboards. It runs on any Kubernetes cluster; Fleet is only one way to install it. Series carry a `cluster` label.
+Helm chart `chart/` (`trivy-grafana`): a thin wrapper around [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) (dependency pinned in `chart/Chart.yaml`, trimmed to Prometheus + Grafana) that scrapes the trivy-operator `/metrics` of one or more clusters and ships the Trivy dashboards. It runs on any Kubernetes cluster; Fleet is only one way to install it. Series carry a `cluster` label.
 
 - local cluster: in-cluster service `trivy-operator.trivy-system.svc:80` (`global.observability.localCluster`)
 - other clusters: kube-apiserver service proxy `https://<address>:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics`, with the token of a ServiceAccount allowed `services/proxy` get in `trivy-system` (here the `kube-system/metrics-reader` ServiceAccount and Role `metrics-reader-trivy-metrics` from the `monitoring-network` repo)
@@ -65,10 +65,10 @@ helm dependency build chart
 helm upgrade --install kube-prometheus-stack chart -n monitoring -f values-site.yaml
 ```
 
-With Rancher Fleet (`chart/fleet.yaml`, ignored by Helm): the site values go to the ConfigMap `monitoring/observability-site` read with `helm.valuesFrom`, then the GitRepo `fleet/gitrepo.yaml` gets repo and auth secret from `fleetGitRepo` in the same file:
+With Rancher Fleet (`chart/fleet.yaml`, ignored by Helm): the site values go to the ConfigMap `monitoring/trivy-grafana-site` read with `helm.valuesFrom`, then the GitRepo `fleet/gitrepo.yaml` gets repo and auth secret from `fleetGitRepo` in the same file:
 
 ```bash
-kubectl -n monitoring create configmap observability-site --from-file=values.yaml=values-site.yaml \
+kubectl -n monitoring create configmap trivy-grafana-site --from-file=values.yaml=values-site.yaml \
   --dry-run=client -o yaml | kubectl apply -f -
 yq -y --arg repo "$(yq -r '.fleetGitRepo.repo' values-site.yaml)" --arg auth "$(yq -r '.fleetGitRepo.clientSecretName' values-site.yaml)" \
   '.spec.repo = $repo | .spec.clientSecretName = $auth' fleet/gitrepo.yaml | kubectl apply -f -
