@@ -7,7 +7,15 @@ Observability stack
 Prometheus + Grafana on the Rancher cluster (`kube-prometheus-stack`, trimmed), scraping the trivy-operator `/metrics` of every cluster; series carry a `cluster` label (`rancher`, `cluster-a`, `cluster-b`, `cluster-c`).
 
 - Rancher cluster: in-cluster service `trivy-operator.trivy-system.svc:80`
-- downstream clusters: kube-apiserver service proxy `https://<cluster>-cluster-api.example.org:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics`, with a token of the `kube-system/metrics-reader` ServiceAccount (Role `metrics-reader-trivy-metrics`: `services/proxy` get in `trivy-system`)
+- downstream clusters: kube-apiserver service proxy `https://<master-ip>:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics`, with a token of the `kube-system/metrics-reader` ServiceAccount (Role `metrics-reader-trivy-metrics`: `services/proxy` get in `trivy-system`)
+
+| cluster | scraped master | TLS `server_name` |
+|---|---|---|
+| `cluster-a` | `192.0.2.25` | `cluster-a-cluster-api.example.org` |
+| `cluster-b` | `192.0.2.161` | `cluster-b-cluster-api.example.org` |
+| `cluster-c` | `192.0.2.11` | `cluster-c-cluster-api.example.org` |
+
+The `<cluster>-cluster-api.example.org` names have no load-balanced address yet, so each cluster is scraped through a single master (one target only: more masters would scrape the same trivy-operator and duplicate the series). The certificate is still verified against the `-api` name, which is in each cluster's `tls-san`. When the apiserver VIPs exist, switch the targets back to the hostnames and drop the `toCIDR` rule from `monitoring-egress-NetworkPolicy.yaml`.
 
 ### 1. Downstream RBAC
 
@@ -26,6 +34,7 @@ rm /tmp/token /tmp/ca.crt
 
 # check from outside
 curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
+  --resolve cluster-a-cluster-api.example.org:6443:192.0.2.25 \
   https://cluster-a-cluster-api.example.org:6443/api/v1/namespaces/trivy-system/services/trivy-operator:80/proxy/metrics | head
 ```
 

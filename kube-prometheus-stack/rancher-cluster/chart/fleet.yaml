@@ -69,9 +69,11 @@ helm:
               credentials_file: /etc/prometheus/secrets/trivy-metrics-cluster-a/token
             tls_config:
               ca_file: /etc/prometheus/secrets/trivy-metrics-cluster-a/ca.crt
+              server_name: cluster-a-cluster-api.example.org
             static_configs:
+              # single master until the apiserver VIP exists; one target only, more would duplicate series
               - targets:
-                  - cluster-a-cluster-api.example.org:6443
+                  - 192.0.2.25:6443
                 labels:
                   cluster: cluster-a
           - job_name: trivy-operator-cluster-b
@@ -82,9 +84,10 @@ helm:
               credentials_file: /etc/prometheus/secrets/trivy-metrics-cluster-b/token
             tls_config:
               ca_file: /etc/prometheus/secrets/trivy-metrics-cluster-b/ca.crt
+              server_name: cluster-b-cluster-api.example.org
             static_configs:
               - targets:
-                  - cluster-b-cluster-api.example.org:6443
+                  - 192.0.2.161:6443
                 labels:
                   cluster: cluster-b
           - job_name: trivy-operator-cluster-c
@@ -95,9 +98,10 @@ helm:
               credentials_file: /etc/prometheus/secrets/trivy-metrics-cluster-c/token
             tls_config:
               ca_file: /etc/prometheus/secrets/trivy-metrics-cluster-c/ca.crt
+              server_name: cluster-c-cluster-api.example.org
             static_configs:
               - targets:
-                  - cluster-c-cluster-api.example.org:6443
+                  - 192.0.2.11:6443
                 labels:
                   cluster: cluster-c
 
