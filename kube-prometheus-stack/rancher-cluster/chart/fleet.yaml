@@ -119,9 +119,27 @@ helm:
       grafana.ini:
         server:
           root_url: https://grafana.example.org
+        # no internet egress: skip the default plugin downloads and update checks on grafana.com
+        plugins:
+          preinstall_disabled: true
+        analytics:
+          reporting_enabled: false
+          check_for_updates: false
+          check_for_plugin_updates: false
+      # sidecars read only ConfigMaps in monitoring: Role grafana-sidecar from the manifests bundle, no cluster-wide secrets access
+      rbac:
+        namespaced: true
+        useExistingRole: grafana-sidecar
       # dashboards are ConfigMaps from the rancher-cluster/dashboards bundle, folder from their grafana_folder annotation
       sidecar:
+        # 2.14.1 (chart default) has a CRITICAL (certifi) and OS HIGH findings fixed in 2.14.3
+        image:
+          tag: 2.14.3
         dashboards:
+          searchNamespace: monitoring
+          resource: configmap
           folderAnnotation: grafana_folder
           provider:
             foldersFromFilesStructure: true
+        datasources:
+          resource: configmap

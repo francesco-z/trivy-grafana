@@ -47,7 +47,7 @@ kubectl -n monitoring create secret generic grafana-admin \
 kubectl apply -f kube-prometheus-stack/kube-prometheus-stack-rancher-cluster.yaml   # GitRepo, fleet-local
 ```
 
-The GitRepo deploys three bundles from `kube-prometheus-stack/rancher-cluster`: `chart/` (the Helm chart, values inline in its `fleet.yaml`), `manifests/` (HTTPRoute and egress CiliumNetworkPolicy) and `dashboards/` (kustomize: one ConfigMap per dashboard JSON, loaded by the Grafana sidecar). Change values in git, not in the Rancher console. `kube-prometheus-stack/secrets.yaml` is only a template and stays outside the GitRepo path.
+The GitRepo deploys three bundles from `kube-prometheus-stack/rancher-cluster`: `chart/` (the Helm chart, values inline in its `fleet.yaml`), `manifests/` (HTTPRoute, egress CiliumNetworkPolicy and the ConfigMap-only Role `grafana-sidecar` bound by the chart) and `dashboards/` (kustomize: one ConfigMap per dashboard JSON, loaded by the Grafana sidecar). Change values in git, not in the Rancher console. `kube-prometheus-stack/secrets.yaml` is only a template and stays outside the GitRepo path.
 
 Grafana is published on `https://grafana.example.org` through the Gateway `gateway-system/application` (port 30080 on nodes); the external nginx needs the matching vhost.
 
@@ -74,6 +74,7 @@ yq '.helm.values' kube-prometheus-stack/rancher-cluster/chart/fleet.yaml \
   | helm install kube-prometheus-stack prometheus-community/kube-prometheus-stack --version 92.14.1 \
     -f - --namespace monitoring
 kubectl apply -f kube-prometheus-stack/rancher-cluster/manifests/httproute.yaml \
+  -f kube-prometheus-stack/rancher-cluster/manifests/grafana-sidecar-Role.yaml \
   -f kube-prometheus-stack/rancher-cluster/manifests/monitoring-egress-NetworkPolicy.yaml
 kubectl apply -k kube-prometheus-stack/rancher-cluster/dashboards
 ```

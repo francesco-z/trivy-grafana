@@ -1,0 +1,11 @@
+---
+# bound by the chart (grafana.rbac.useExistingRole): the dashboard and datasource sidecars only need ConfigMaps
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: grafana-sidecar
+  namespace: monitoring
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    verbs: ["get", "watch", "list"]
