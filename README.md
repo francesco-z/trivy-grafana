@@ -39,10 +39,11 @@ kubectl -n monitoring create secret generic grafana-admin \
 For the other clusters, one Secret `trivy-metrics` with their tokens (kube contexts named like the clusters):
 
 ```bash
+TOKEN_SECRET=metrics-reader-token  # token Secret of your ServiceAccount in kube-system
 args=()
 for c in $(yq -r '.global.observability.clusters[].name' values-site.yaml); do
-  kubectl --context "$c" -n kube-system get secret metrics-reader-token -o jsonpath='{.data.token}' | base64 -d > "/tmp/$c-token"
-  kubectl --context "$c" -n kube-system get secret metrics-reader-token -o jsonpath='{.data.ca\.crt}' | base64 -d > "/tmp/$c-ca.crt"
+  kubectl --context "$c" -n kube-system get secret "$TOKEN_SECRET" -o jsonpath='{.data.token}' | base64 -d > "/tmp/$c-token"
+  kubectl --context "$c" -n kube-system get secret "$TOKEN_SECRET" -o jsonpath='{.data.ca\.crt}' | base64 -d > "/tmp/$c-ca.crt"
   args+=(--from-file="/tmp/$c-token" --from-file="/tmp/$c-ca.crt")
 done
 kubectl -n monitoring create secret generic trivy-metrics "${args[@]}"
