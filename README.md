@@ -2,6 +2,8 @@
 
 Everyday CVE console: Prometheus + Grafana (a trimmed kube-prometheus-stack) collecting Trivy Operator results from every cluster, so the security team opens one Grafana folder each morning and sees new CVEs, what to fix and where.
 
+![Security overview morning Dashboard](images/Trivy-Security_overview.png)
+
 ## Trivy Operator metrics in Grafana
 
 Helm chart `chart/` (`trivy-grafana`): a thin wrapper around [kube-prometheus-stack](https://github.com/prometheus-community/helm-charts/tree/main/charts/kube-prometheus-stack) (dependency pinned in `chart/Chart.yaml`, trimmed to Prometheus + Grafana) that scrapes the trivy-operator `/metrics` of one or more clusters and ships the Trivy dashboards. It runs on any Kubernetes cluster; Fleet is only one way to install it. Series carry a `cluster` label.
